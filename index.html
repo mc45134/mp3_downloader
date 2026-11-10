@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MP3 音樂下載器</title>
+<style>
+  :root{
+    --bg:#0f1117; --card:#181b24; --card2:#1f2330; --line:#2a2f3e;
+    --txt:#e8eaf0; --sub:#9aa1b2; --acc:#7c6cff; --acc2:#9d8fff;
+    --ok:#3ecf8e; --err:#ff6b6b; --warn:#ffb454;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{
+    background:radial-gradient(1200px 600px at 80% -10%, #23264055, transparent), var(--bg);
+    color:var(--txt); font-family:"Microsoft JhengHei","PingFang TC",system-ui,sans-serif;
+    min-height:100vh; padding-bottom:120px;
+  }
+  header{padding:28px 32px 8px; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+  header .logo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--acc),#4e9fff); font-size:22px}
+  header h1{font-size:22px; font-weight:700}
+  header .sub{color:var(--sub); font-size:13px; margin-top:3px}
+  main{max-width:980px; margin:0 auto; padding:12px 20px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; margin-top:18px}
+  .step-label{display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--acc2);
+    font-weight:700; letter-spacing:1px; margin-bottom:12px}
+  .step-label .n{width:22px;height:22px;border-radius:50%;background:var(--acc);color:#fff;
+    display:grid;place-items:center;font-size:12px}
+  /* 搜尋 */
+  .search-row{display:flex; gap:10px}
+  input[type=text]{
+    flex:1; background:var(--card2); border:1px solid var(--line); color:var(--txt);
+    border-radius:10px; padding:12px 16px; font-size:15px; outline:none;
+  }
+  input[type=text]:focus{border-color:var(--acc)}
+  button{
+    background:linear-gradient(135deg,var(--acc),#5d7cff); color:#fff; border:none;
+    border-radius:10px; padding:12px 22px; font-size:15px; font-weight:700; cursor:pointer;
+    transition:filter .15s;
+  }
+  button:hover{filter:brightness(1.15)}
+  button:disabled{opacity:.45; cursor:not-allowed}
+  button.ghost{background:var(--card2); border:1px solid var(--line); color:var(--txt); font-weight:500}
+  button.danger{background:#3a2430; border:1px solid #5c2f3d; color:#ff9c9c}
+  .hint{color:var(--sub); font-size:13px; margin-top:10px}
+  .artists{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; margin-top:16px}
+  .artist{background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:14px;
+    cursor:pointer; transition:.15s}
+  .artist:hover{border-color:var(--acc); transform:translateY(-2px)}
+  .artist .name{font-weight:700; font-size:15px}
+  .artist .genre{color:var(--sub); font-size:12px; margin-top:4px}
+  /* 歌曲列表 */
+  .toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px}
+  .toolbar input[type=text]{max-width:260px; padding:9px 14px; font-size:14px}
+  .count-badge{background:var(--card2); border:1px solid var(--line); padding:8px 14px; border-radius:10px;
+    font-size:13px; color:var(--sub)}
+  .album{margin-bottom:14px; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+  .album-head{display:flex; align-items:center; gap:10px; padding:11px 14px; background:var(--card2);
+    font-size:14px; font-weight:700; flex-wrap:wrap}
+  .album-head .yr{color:var(--sub); font-weight:400; font-size:12px}
+  .album-head .sel-all{margin-left:auto; font-size:12px; color:var(--acc2); cursor:pointer; font-weight:500}
+  .song{display:flex; align-items:center; gap:12px; padding:9px 14px; border-top:1px solid var(--line);
+    font-size:14px; cursor:pointer}
+  .song:hover{background:#ffffff08}
+  .song.checked{background:#7c6cff14}
+  .song .no{color:var(--sub); font-size:12px; width:26px; text-align:right; flex-shrink:0}
+  .song .tt{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .song .dur{color:var(--sub); font-size:12px; flex-shrink:0}
+  input[type=checkbox]{width:17px; height:17px; accent-color:var(--acc); cursor:pointer; flex-shrink:0}
+  /* 底部動作列 */
+  .action-bar{
+    position:fixed; left:0; right:0; bottom:0; background:#12141cee; backdrop-filter:blur(8px);
+    border-top:1px solid var(--line); padding:14px 20px; display:none; z-index:50;
+  }
+  .action-bar .inner{max-width:980px; margin:0 auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+  .action-bar .info{color:var(--sub); font-size:13px; flex:1; min-width:200px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  /* 隊列 */
+  .job{display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid var(--line);
+    border-radius:10px; margin-top:8px; font-size:14px; background:var(--card2)}
+  .job .jt{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .job .st{font-size:12px; color:var(--sub); flex-shrink:0; max-width:220px; text-align:right}
+  .job.done .st{color:var(--ok)} .job.error .st{color:var(--err)} .job.stopped .st{color:var(--warn)}
+  .bar{height:5px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:6px}
+  .bar i{display:block; height:100%; background:linear-gradient(90deg,var(--acc),#4e9fff); width:0%;
+    transition:width .4s}
+  .spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;
+    animation:sp 1s linear infinite; flex-shrink:0}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--sub)}
+  .job.done .dot{background:var(--ok)} .job.error .dot{background:var(--err)} .job.stopped .dot{background:var(--warn)}
+  .row{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; align-items:center}
+  .hidden{display:none !important}
+  .errbox{background:#3a2430; border:1px solid #5c2f3d; color:#ffb3b3; padding:12px 16px;
+    border-radius:10px; font-size:14px; margin-top:12px}
+  .settings{font-size:13px; color:var(--sub); display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  select{background:var(--card2); border:1px solid var(--line); color:var(--txt); border-radius:8px;
+    padding:8px 10px; font-size:13px}
+  .busy-pill{font-size:12px; padding:4px 12px; border-radius:999px; border:1px solid var(--line); color:var(--sub)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🎵</div>
+  <div>
+    <h1>MP3 音樂下載器</h1>
+    <div class="sub">輸入歌手 → 選歌 → 自動到 YouTube 下載並轉成 MP3</div>
+  </div>
+</header>
+
+<main>
+  <!-- 步驟 1：搜尋歌手 -->
+  <section class="card">
+    <div class="step-label"><span class="n">1</span>搜尋歌手 / 藝人 / 團體</div>
+    <div class="search-row">
+      <input type="text" id="artist-q" placeholder="例如：周杰倫、五月天、Taylor Swift…" />
+      <button id="btn-search">搜尋</button>
+    </div>
+    <div class="hint">歌單資料來自 iTunes 音樂庫；下載時會逐首到 YouTube 搜尋對應音訊。</div>
+    <div class="artists" id="artist-list"></div>
+    <div id="artist-err"></div>
+  </section>
+
+  <!-- 步驟 2：選歌 -->
+  <section class="card hidden" id="songs-card">
+    <div class="step-label"><span class="n">2</span>
+      <span id="artist-title">歌曲列表</span>
+      <button class="ghost" id="btn-change" style="padding:5px 12px;font-size:12px;">換歌手</button>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="filter" placeholder="篩選歌名…" />
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--sub);cursor:pointer">
+        <input type="checkbox" id="sel-all" /> 全選
+      </label>
+      <span class="count-badge" id="song-count"></span>
+      <label class="settings">優先地區
+        <select id="country">
+          <option value="TW">TW 台灣</option>
+          <option value="HK">HK 香港</option>
+          <option value="US">US 美國</option>
+          <option value="JP">JP 日本</option>
+          <option value="KR">KR 韓國</option>
+        </select>
+      </label>
+      <button class="ghost" id="btn-reload" style="padding:8px 14px;font-size:13px;">重新載入歌單</button>
+      <span class="count-badge" id="src-badge" style="display:none"></span>
+    </div>
+    <div id="album-list"></div>
+    <div id="songs-err"></div>
+  </section>
+
+  <!-- 步驟 3：下載進度 -->
+  <section class="card hidden" id="queue-card">
+    <div class="step-label"><span class="n">3</span>下載隊列
+      <span class="busy-pill" id="busy-pill">閒置</span>
+    </div>
+    <div id="job-list"></div>
+    <div class="row">
+      <button class="danger" id="btn-stop">停止下載</button>
+      <button class="ghost" id="btn-clear">清除已完成</button>
+      <span class="settings" id="outdir-label"></span>
+    </div>
+  </section>
+</main>
+
+<!-- 底部動作列 -->
+<div class="action-bar" id="action-bar">
+  <div class="inner">
+    <span class="info" id="sel-info"></span>
+    <button id="btn-download">⬇ 開始下載所選歌曲</button>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+if(location.protocol === "file:"){
+  window.addEventListener("DOMContentLoaded", ()=>{
+    document.querySelector("main").insertAdjacentHTML("afterbegin",
+      `<div class="errbox" style="font-size:15px">⚠ 不能直接打開這個網頁檔來使用！<br>
+       請回到「mp3下載」資料夾，雙擊 <b>開始下載MP3.bat</b>（或 <b>背景啟動(無視窗).vbs</b>）啟動程式，瀏覽器會自動開啟正確頁面。</div>`);
+  });
+}
+
+let ARTIST = null;          // {id, name}
+let ALBUMS = [];            // 目前歌單
+let SEL = new Map();        // key -> {title, artist, album, alt[]}
+let pollTimer = null;
+
+function err(el, msg){ el.innerHTML = msg ? `<div class="errbox">${msg}</div>` : ""; }
+function netErrMsg(e){
+  const m = String(e && e.message || e);
+  if(/fetch|network|failed to fetch|load failed|networkerror/i.test(m)){
+    return "連不到本機伺服器。請確認「開始下載MP3.bat」的視窗還在運行（或改用 背景啟動(無視窗).vbs），然後重新整理此頁。";
+  }
+  return m;
+}
+function esc(s){ return String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function fmtDur(ms){ if(!ms) return "--:--"; const s=Math.round(ms/1000);
+  return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
+function key(i,a,t){ return i+"|"+a+"|"+t; }
+function selFrom(el){
+  let alt=[]; try{ alt=JSON.parse(el.dataset.alt||"[]"); }catch(e){}
+  return {title:el.dataset.t, artist:el.dataset.ar, album:el.dataset.al, alt};
+}
+
+async function api(path, opt){
+  const r = await fetch(path, opt);
+  const d = await r.json();
+  if(d.error) throw new Error(d.error);
+  return d;
+}
+
+/* ---------- 步驟 1 ---------- */
+async function searchArtist(){
+  const q = $("artist-q").value.trim();
+  if(!q) return;
+  err($("artist-err"),"");
+  const oldHint = $("pick-hint"); if(oldHint) oldHint.remove();
+  $("artist-list").innerHTML = '<div class="hint">搜尋中…</div>';
+  try{
+    const d = await api("/api/artists?q="+encodeURIComponent(q));
+    if(!d.artists.length){ $("artist-list").innerHTML='<div class="hint">找不到相符的歌手，請換個寫法再試。</div>'; return; }
+    $("artist-list").innerHTML = d.artists.map(a=>`
+      <div class="artist" data-id="${a.id}" data-name="${esc(a.name)}">
+        <div class="name">${esc(a.name)}</div>
+        <div class="genre">${esc(a.genre||"")} · 點擊載入歌單 →</div>
+      </div>`).join("");
+    document.querySelectorAll(".artist").forEach(el=>{
+      el.onclick = ()=> pickArtist(el.dataset.id, el.dataset.name);
+    });
+    if(d.artists.length === 1){
+      pickArtist(d.artists[0].id, d.artists[0].name);
+    } else {
+      $("artist-list").insertAdjacentHTML("beforebegin",
+        '<div class="hint" id="pick-hint" style="color:var(--acc2)">👇 有多個相符結果——請點擊其中一個歌手卡片，展開該歌手的完整專輯與歌曲列表。</div>');
+    }
+  }catch(e){
+    $("artist-list").innerHTML="";
+    err($("artist-err"), "搜尋失敗："+esc(netErrMsg(e)));
+  }
+}
+$("btn-search").onclick = searchArtist;
+$("artist-q").addEventListener("keydown", e=>{ if(e.key==="Enter") searchArtist(); });
+
+/* ---------- 步驟 2 ---------- */
+async function pickArtist(id, name){
+  ARTIST = {id, name};
+  SEL.clear();
+  $("songs-card").classList.remove("hidden");
+  $("artist-title").textContent = name + " — 歌曲列表";
+  $("album-list").innerHTML = '<div class="hint">載入歌單中…</div>';
+  err($("songs-err"),"");
+  try{
+    const d = await api(`/api/songs?artist_id=${id}&country=${$("country").value}`);
+    ALBUMS = d.albums||[];
+    const cu = d.countries_used||[];
+    if(cu.length){
+      $("src-badge").style.display = "";
+      const langName = {"ja":"日文","ko":"韓文","zh":"中文","en":"英文"}[d.lang] || "";
+      $("src-badge").textContent = "歌單合併自 " + cu.join("、") + " 商店" +
+        "｜重複歌曲已按專輯＋時長去重" + (langName ? "（" + langName + "歌名優先）" : "");
+    } else {
+      $("src-badge").style.display = "none";
+    }
+    if(!ALBUMS.length){
+      $("album-list").innerHTML = '<div class="hint">所有地區商店都找不到這位歌手的歌曲，請換個名字搜尋。</div>';
+    }
+    renderAlbums();
+    $("songs-card").scrollIntoView({behavior:"smooth"});
+  }catch(e){
+    $("album-list").innerHTML="";
+    err($("songs-err"), "載入歌單失敗："+esc(netErrMsg(e)));
+  }
+}
+$("btn-change").onclick = ()=>{
+  $("songs-card").classList.add("hidden");
+  $("action-bar").style.display="none";
+  window.scrollTo({top:0, behavior:"smooth"});
+};
+$("btn-reload").onclick = ()=> ARTIST && pickArtist(ARTIST.id, ARTIST.name);
+$("country").onchange = ()=> ARTIST && pickArtist(ARTIST.id, ARTIST.name);
+
+$("filter").addEventListener("input", renderAlbums);
+
+function songMatches(s, kw){ return !kw || s.title.toLowerCase().includes(kw); }
+
+function renderAlbums(){
+  const kw = $("filter").value.trim().toLowerCase();
+  let total=0, html="";
+  ALBUMS.forEach(al=>{
+    const songs = al.songs.filter(s=>songMatches(s,kw));
+    if(!songs.length) return;
+    total += songs.length;
+    html += `<div class="album">
+      <div class="album-head">
+        <span>💿 ${esc(al.title)}</span>
+        <span class="yr">${esc(al.year||"")}</span>
+        <span class="yr">（${songs.length} 首）</span>
+        <span class="sel-all" data-album="${esc(al.title)}">全選此專輯</span>
+      </div>
+      ${songs.map((s,i)=>{
+        const k = key(s.title, s.album||al.title, s.artist);
+        const ck = SEL.has(k) ? "checked" : "";
+        return `<div class="song ${ck}" data-k="${esc(k)}" data-t="${esc(s.title)}" data-ar="${esc(s.artist)}" data-al="${esc(s.album||al.title)}" data-alt="${esc(JSON.stringify(s.alt||[]))}">
+          <input type="checkbox" ${ck ? "checked":""} />
+          <span class="no">${i+1}</span>
+          <span class="tt">${esc(s.title)}</span>
+          <span class="dur">${fmtDur(s.duration)}</span>
+        </div>`;
+      }).join("")}
+    </div>`;
+  });
+  $("album-list").innerHTML = html || '<div class="hint">沒有符合的歌曲。</div>';
+  $("song-count").textContent = kw ? `${total} 首（篩選後）` : `${ALBUMS.length} 張專輯 / ${total} 首歌`;
+  document.querySelectorAll(".song").forEach(el=>{
+    el.onclick = ()=> toggleSong(el);
+  });
+  document.querySelectorAll(".sel-all").forEach(el=>{
+    el.onclick = ()=>{
+      const album = el.dataset.album;
+      document.querySelectorAll(".song").forEach(s=>{
+        if(s.dataset.al===album && !SEL.has(s.dataset.k)){
+          SEL.set(s.dataset.k, selFrom(s));
+        }
+      });
+      renderAlbums(); updateBar();
+    };
+  });
+  updateBar();
+}
+
+function toggleSong(el){
+  const k = el.dataset.k;
+  if(SEL.has(k)) SEL.delete(k);
+  else SEL.set(k, selFrom(el));
+  el.classList.toggle("checked");
+  el.querySelector("input").checked = SEL.has(k);
+  updateBar();
+}
+
+$("sel-all").onchange = e=>{
+  if(e.target.checked){
+    document.querySelectorAll(".song").forEach(s=>{
+      SEL.set(s.dataset.k, selFrom(s));
+    });
+  } else SEL.clear();
+  renderAlbums(); updateBar();
+};
+
+function updateBar(){
+  const n = SEL.size;
+  $("action-bar").style.display = n>0 ? "block" : "none";
+  $("sel-info").textContent = n ? `已選 ${n} 首（${ARTIST?ARTIST.name:""}）— 將逐首到 YouTube 搜尋並下載為 MP3` : "";
+}
+
+/* ---------- 步驟 3：下載 ---------- */
+$("btn-download").onclick = async ()=>{
+  if(!SEL.size) return;
+  const tracks = [...SEL.values()];
+  try{
+    await api("/api/download", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({tracks})});
+    SEL.clear(); renderAlbums(); updateBar();
+    $("queue-card").classList.remove("hidden");
+    $("queue-card").scrollIntoView({behavior:"smooth"});
+    startPoll();
+  }catch(e){ alert("加入隊列失敗："+e.message); }
+};
+
+$("btn-stop").onclick = ()=> api("/api/stop",{method:"POST",body:"{}"});
+$("btn-clear").onclick = async ()=>{ await api("/api/clear",{method:"POST",body:"{}"}); poll(); };
+
+async function poll(){
+  try{
+    const d = await api("/api/status");
+    $("busy-pill").textContent = d.busy ? "下載中…" : "閒置";
+    $("busy-pill").style.color = d.busy ? "var(--acc2)" : "var(--sub)";
+    if(!d.ffmpeg) $("outdir-label").innerHTML = "⚠ 找不到 ffmpeg，轉 MP3 可能失敗";
+    const jl = $("job-list");
+    if(!d.jobs.length){ jl.innerHTML = '<div class="hint">隊列是空的，先到上面選歌吧。</div>'; }
+    jl.innerHTML = d.jobs.map(j=>{
+      const active = j.status==="downloading"||j.status==="pending";
+      const icon = active ? '<div class="spin"></div>' : '<div class="dot"></div>';
+      const msg = j.status==="done" ? `✔ ${esc(j.message)}`
+                : j.status==="error" ? `✖ ${esc(j.message)}`
+                : j.status==="stopped" ? `⏹ ${esc(j.message)}`
+                : esc(j.message)+" "+j.progress+"%";
+      return `<div class="job ${j.status}">
+        ${icon}
+        <div style="flex:1;min-width:0">
+          <div class="jt">${esc(j.artist?j.artist+" - ":"")}${esc(j.title)}</div>
+          ${active?`<div class="bar"><i style="width:${j.progress}%"></i></div>`:""}
+        </div>
+        <div class="st">${msg}</div>
+      </div>`;
+    }).join("");
+    if(d.jobs.length) $("queue-card").classList.remove("hidden");
+    return d;
+  }catch(e){ /* 伺服器未就緒 */ }
+}
+
+function startPoll(){
+  if(pollTimer) return;
+  pollTimer = setInterval(async ()=>{
+    const d = await poll();
+    if(d && d.jobs.length && !d.busy && d.jobs.every(j=>!["pending","downloading"].includes(j.status))){
+      clearInterval(pollTimer); pollTimer=null;
+    }
+  }, 1200);
+}
+
+/* ---------- 設定顯示 ---------- */
+async function loadCfg(){
+  try{
+    const c = await api("/api/config");
+    $("outdir-label").textContent = "📁 下載位置：" + (c.downloads_dir || c.output_dir) +
+      "（歌曲會存入各專輯資料夾，每個專輯資料夾內附 下載記錄.txt）";
+    $("country").value = c.country || "TW";
+  }catch(e){}
+}
+poll(); loadCfg(); startPoll();
+</script>
+</body>
+</html>
